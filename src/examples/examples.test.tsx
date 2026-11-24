@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DataFromApi from './DataFromApi'
@@ -18,6 +18,28 @@ describe('DataFromApi', () => {
       vi.advanceTimersByTime(3000)
     })
     expect(screen.getByText('Finished Loading')).toBeInTheDocument()
+  })
+
+  it('cycles the Loading dots 0..3 and wraps to 1', () => {
+    render(<DataFromApi loading={true} />)
+    const dots = (n: number) => screen.getByText(`Loading${'.'.repeat(n)}`)
+    expect(dots(0)).toBeInTheDocument()
+    for (const n of [1, 2, 3, 1, 2]) {
+      act(() => {
+        vi.advanceTimersByTime(300)
+      })
+      expect(dots(n)).toBeInTheDocument()
+    }
+  })
+
+  it('toggles back to Loading after 3s when loading=false', () => {
+    render(<DataFromApi loading={false} />)
+    expect(screen.getByText('Finished Loading')).toBeInTheDocument()
+    act(() => {
+      vi.advanceTimersByTime(3000)
+    })
+    expect(screen.getByText(/^Loading/)).toBeInTheDocument()
+    expect(screen.queryByText('Finished Loading')).not.toBeInTheDocument()
   })
 })
 
@@ -67,5 +89,23 @@ describe('Draggable', () => {
   it('renders', () => {
     render(<Draggable />)
     expect(screen.getByText('Tst')).toBeInTheDocument()
+  })
+
+  it('resizes on handle drag and stops after mouseup', () => {
+    const widthSpy = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(200)
+    const heightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(50)
+    try {
+      render(<Draggable />)
+      const box = screen.getByText('Tst').parentElement as HTMLElement
+      fireEvent.mouseDown(screen.getByTestId('resize-handle'), { clientX: 100, clientY: 100 })
+      fireEvent.mouseMove(document, { clientX: 130, clientY: 120 })
+      expect(box).toHaveStyle({ width: '230px', height: '70px' })
+      fireEvent.mouseUp(document)
+      fireEvent.mouseMove(document, { clientX: 300, clientY: 300 })
+      expect(box).toHaveStyle({ width: '230px', height: '70px' })
+    } finally {
+      widthSpy.mockRestore()
+      heightSpy.mockRestore()
+    }
   })
 })
